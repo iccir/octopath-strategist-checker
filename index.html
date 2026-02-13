@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8" />
+<title>Read File Example</title>
+<style>
+
+body {
+    font: 18px system-ui, sans-serif;
+}
+
+#output {
+    margin-top: 32px;
+}
+
+</style>
+<script>
+
+let gAddress = 0;
+let gDataView = null;
+
+
+
+function abort()
+{
+    throw new Error();
+}
+
+
+function advance(n)
+{
+    gAddress += n;
+}
+
+
+function readBoolean()
+{
+    let result = gDataView.getInt8(gAddress, 1);
+    advance(1);
+    return !!result;
+}
+
+
+function readNumber()
+{
+    let result = gDataView.getInt32(gAddress, true);
+    advance(4);
+    return result;
+}
+
+
+function readText(n)
+{
+    let bytes = new Uint8Array(gDataView.buffer, gDataView.byteOffset + gAddress, n - 1);
+    advance(n);    
+    return new TextDecoder("utf-8").decode(bytes);
+}
+
+
+function readString()
+{
+    let length = readNumber();
+    return readText(length);
+}
+
+
+function readRecord(address)
+{
+    gAddress = address;
+
+    let name = readString();
+    if (!name) abort();
+
+    let type = readString();
+    if (!type) abort();
+    
+    if (type == "IntProperty") {
+        advance(9);
+        value = readNumber();
+        advance(17);
+    }
+
+    return { name: name, type: type, value: value };
+}
+
+function checkWeakness(weaknessDataRow)
+{
+    let offset    = weaknessDataRow[0];
+    let bitString = weaknessDataRow[1];
+    let enemyName = weaknessDataRow[2];
+
+    let expectedValue = (
+        (parseInt(bitString.split(" ")[0], 2) << 8) +
+        (parseInt(bitString.split(" ")[1], 2) << 0)
+    );
+
+    if (expectedValue == 0) return;
+
+    let record = readRecord(gOffset + offset);
+    let actualValue = record.value;
+
+    if (expectedValue != actualValue) {
+        return enemyName;
+    } else {
+        return null;
+    }   
+}
+
+
+
+
+
+/*
+    Data from:
+    https://docs.google.com/spreadsheets/d/1O1OYHmLNsUcak5dByXbmEFDaxIbp-mDSHGC6j92P5ho
+*/
+function getWeaknessData()
+{
+    return [
+        [ 0x00000, "010000 010101", "Highland Ratkin I" ],
+        [ 0x000a6, "010000 010101", "Highland Ratkin II" ],
+        [ 0x0014c, "100000 010010", "Highland Ratkin III" ],
+        [ 0x001f2, "011000 010001", "Highland Ratkin IV" ],
+        [ 0x00298, "011000 010001", "Highland Ratkin V" ],
+        [ 0x0033e, "100000 001010", "Highland Ratkin VI" ],
+        [ 0x003e4, "010100 100010", "Highland Ratking I" ],
+        [ 0x0048a, "010100 100010", "Highland Ratking II" ],
+        [ 0x00530, "100000 000101", "Highland Ratking III" ],
+        [ 0x005d6, "100000 001001", "Rockadillo" ],
+        [ 0x0067c, "101000 010110", "Giant Falcon" ],
+        [ 0x00722, "010000 000011", "Highland Goat" ],
+        [ 0x007c8, "000000 001101", "Army Ant" ],
+        [ 0x0086e, "000001 001010", "Shaggy Aurochs" ],
+        [ 0x00914, "000110 001000", "Wild Weasel" ],
+        [ 0x009ba, "000000 000000", "" ],
+        [ 0x00a60, "001001 000000", "Lightning Elemental" ],
+        [ 0x00b06, "001001 010010", "Winged Serpent" ],
+        [ 0x00bac, "010000 000001", "Devourer of Dreams" ],
+        [ 0x00c52, "101000 010110", "Dread Falcon" ],
+        [ 0x00cf8, "100000 001010", "Dread Viper" ],
+        [ 0x00d9e, "010000 000011", "Mountain Goat" ],
+        [ 0x00e44, "000000 000000", "" ],
+        [ 0x00eea, "000010 001011", "Blood Remnant" ],
+        [ 0x00f90, "010000 001011", "Dark Remnant" ],
+        [ 0x01036, "001000 010110", "Shadow Raven" ],
+        [ 0x010dc, "010000 000011", "Demon Goat" ],
+        [ 0x01182, "000000 001101", "Dire Army Ant" ],
+        [ 0x01228, "101000 000101", "Brigand I" ],
+        [ 0x012ce, "101000 000101", "Brigand II" ],
+        [ 0x01374, "100100 000101", "Brigand III" ],
+        [ 0x0141a, "010100 001100", "Forest Ratkin I" ],
+        [ 0x014c0, "010100 001100", "Forest Ratkin II" ],
+        [ 0x01566, "000001 001010", "Forest Ratkin III" ],
+        [ 0x0160c, "011000 001001", "Forest Ratkin IV" ],
+        [ 0x016b2, "011000 001001", "Forest Ratkin V" ],
+        [ 0x01758, "000001 001010", "Forest Ratkin VI" ],
+        [ 0x017fe, "001010 100100", "Forest Ratking I" ],
+        [ 0x018a4, "001010 100100", "Forest Ratking II" ],
+        [ 0x0194a, "000100 001001", "Forest Ratking III" ],
+        [ 0x019f0, "000001 110000", "Marmot" ],
+        [ 0x01a96, "000001 001001", "Shambling Weed" ],
+        [ 0x01b3c, "100000 010001", "Giant Boar" ],
+        [ 0x01be2, "000100 010010", "Howler" ],
+        [ 0x01c88, "000001 000100", "Mutant Mushroom" ],
+        [ 0x01d2e, "100100 001010", "Demon Deer" ],
+        [ 0x01dd4, "000000 000000", "" ],
+        [ 0x01e7a, "000100 001000", "Peek-a-Boo" ],
+        [ 0x01f20, "000000 000000", "" ],
+        [ 0x01fc6, "000001 100100", "Carnivorous Plant" ],
+        [ 0x0206c, "000001 110000", "Majestic Marmot" ],
+        [ 0x02112, "000000 101001", "Mossy Meep " ],
+        [ 0x021b8, "010000 001001", "Gabbrodillo" ],
+        [ 0x0225e, "000000 110100", "Red Fox " ],
+        [ 0x02304, "000001 001001", "Rampant Weed" ],
+        [ 0x023aa, "000100 010010", "Horned Howler" ],
+        [ 0x02450, "100000 010001", "Gargantuan Boar" ],
+        [ 0x024f6, "000100 001100", "Green Scissors" ],
+        [ 0x0259c, "001010 000010", "Sea Scorpion" ],
+        [ 0x02642, "000001 001100", "Ettin Serpent" ],
+        [ 0x026e8, "010100 100100", "Buccaneer Bones" ],
+        [ 0x0278e, "011000 101000", "Davy Bones" ],
+        [ 0x02834, "000100 010010", "Black Howler" ],
+        [ 0x028da, "000001 001000", "Raging Treant" ],
+        [ 0x02980, "100010 000101", "Sand Lizardman I" ],
+        [ 0x02a26, "100010 000101", "Sand Lizardman II" ],
+        [ 0x02acc, "100100 000110", "Sand Lizardman III" ],
+        [ 0x02b72, "001010 001100", "Sand Lizardman IV" ],
+        [ 0x02c18, "001010 001100", "Sand Lizardman V" ],
+        [ 0x02cbe, "000100 000110", "Sand Lizardman VI" ],
+        [ 0x02d64, "100010 010001", "Sand Lizardking I" ],
+        [ 0x02e0a, "100010 010001", "Sand Lizardking II" ],
+        [ 0x02eb0, "000100 100100", "Sand Lizardking III" ],
+        [ 0x02f56, "100010 000010", "Cactus Roller" ],
+        [ 0x02ffc, "100010 000000", "Light Wisp" ],
+        [ 0x030a2, "011000 001010", "Sandworm" ],
+        [ 0x03148, "001010 000010", "Giant Scorpion" ],
+        [ 0x031ee, "000001 000001", "Wanderweed" ],
+        [ 0x03294, "100000 100010", "Spiked Skink" ],
+        [ 0x0333a, "000000 000000", "" ],
+        [ 0x033e0, "000000 010010", "Kartikeya" ],
+        [ 0x03486, "000000 000000", "" ],
+        [ 0x0352c, "000000 010010", "Lord of the Sands" ],
+        [ 0x035d2, "100000 001001", "Killer Bug" ],
+        [ 0x03678, "100010 000010", "Skull Roller" ],
+        [ 0x0371e, "000100 000100", "Dark Roller" ],
+        [ 0x037c4, "001010 000010", "Savage Scorpion" ],
+        [ 0x0386a, "011000 001010", "Desert Worm" ],
+        [ 0x03910, "000001 001001", "Withered Wanderweed" ],
+        [ 0x039b6, "001010 000010", "Sand Lizardman I (2)" ],
+        [ 0x03a5c, "001010 000010", "Sand Lizardman II (2)" ],
+        [ 0x03b02, "001010 000010", "Sand Lizardman III (2)" ],
+        [ 0x03ba8, "000010 100010", "Sand Lizardking I (2)" ],
+        [ 0x03c4e, "000010 100010", "Sand Lizardking II (2)" ],
+        [ 0x03cf4, "000000 000000", "" ],
+        [ 0x03d9a, "000010 010011", "Vampire Bat" ],
+        [ 0x03e40, "000000 001001", "Slayer Bug" ],
+        [ 0x03ee6, "001000 010010", "Carmine Eagle" ],
+        [ 0x03f8c, "010001 101000", "Warrior Bones " ],
+        [ 0x04032, "010001 101000", "Brawler Bones" ],
+        [ 0x040d8, "001010 000010", "Venomous Scorpion" ],
+        [ 0x0417e, "010001 101000", "Brigand Bones " ],
+        [ 0x04224, "000110 001001", "Stone Bug" ],
+        [ 0x042ca, "100010 001100", "Stone Serpent" ],
+        [ 0x04370, "100110 100001", "Stone Lizard" ],
+        [ 0x04416, "000100 000100", "Dire Skull Roller" ],
+        [ 0x044bc, "000101 101000", "Ice Lizardman I" ],
+        [ 0x04562, "000101 101000", "Ice Lizardman II" ],
+        [ 0x04608, "100100 100000", "Ice Lizardman III" ],
+        [ 0x046ae, "000001 101100", "Ice Lizardman IV" ],
+        [ 0x04754, "000001 101100", "Ice Lizardman V" ],
+        [ 0x047fa, "100000 110000", "Ice Lizardman VI" ],
+        [ 0x048a0, "000001 000110", "Ice Lizardking I" ],
+        [ 0x04946, "000001 000110", "Ice Lizardking II" ],
+        [ 0x049ec, "100000 110000", "Ice Lizardking III" ],
+        [ 0x04a92, "000101 101000", "Wolf" ],
+        [ 0x04b38, "010001 000000", "Shadow Wisp" ],
+        [ 0x04bde, "001000 001010", "Frost Bear" ],
+        [ 0x04c84, "000000 110101", "Forest Fox" ],
+        [ 0x04d2a, "110100 011000", "Portly Penguin" ],
+        [ 0x04dd0, "100001 010000", "Snow Leopard" ],
+        [ 0x04e76, "000000 000000", "" ],
+        [ 0x04f1c, "010010 101000", "Animated Armor" ],
+        [ 0x04fc2, "000000 010010", "Plains Drake" ],
+        [ 0x05068, "001000 001010", "Dreadwolf" ],
+        [ 0x0510e, "100100 110000", "Snow Marmot" ],
+        [ 0x051b4, "000001 101000", "High Wolf" ],
+        [ 0x0525a, "010001 010000", "Snow Fox" ],
+        [ 0x05300, "010001 010000", "Frost Fox" ],
+        [ 0x053a6, "100000 110010", "White Bat" ],
+        [ 0x0544c, "100000 110010", "Albino Bat " ],
+        [ 0x054f2, "001000 010011", "White Howler" ],
+        [ 0x05598, "001000 010011", "Hoary Howler" ],
+        [ 0x0563e, "100100 000100", "Majestic Snow Marmot" ],
+        [ 0x056e4, "001000 001010", "Hoary Bear" ],
+        [ 0x0578a, "000100 100010", "Snow Yak" ],
+        [ 0x05830, "001000 010110", "Ash Raven" ],
+        [ 0x058d6, "001001 010010", "Frostwing Serpent" ],
+        [ 0x0597c, "000101 000100", "Avalanche Mushroom" ],
+        [ 0x05a22, "001000 000001", "Winter Wanderweed" ],
+        [ 0x05ac8, "100100 010000", "Snow Lizard" ],
+        [ 0x05b6e, "001000 010001", "War Wolf " ],
+        [ 0x05c14, "010001 101000", "Accursed Armor" ],
+        [ 0x05cba, "000000 001000", "Reptalios" ],
+        [ 0x05d60, "000010 010011", "Carnivorous Bat" ],
+        [ 0x05e06, "010100 101000", "Bandit Bones" ],
+        [ 0x05eac, "010010 010000", "Flatlands Froggen I" ],
+        [ 0x05f52, "010010 010000", "Flatlands Froggen II" ],
+        [ 0x05ff8, "000010 101000", "Flatlands Froggen III" ],
+        [ 0x0609e, "010010 000100", "Flatlands Froggen IV" ],
+        [ 0x06144, "010010 000100", "Flatlands Froggen V" ],
+        [ 0x061ea, "000010 011000", "Flatlands Froggen VI" ],
+        [ 0x06290, "100010 100100", "Flatlands Frogking I" ],
+        [ 0x06336, "100010 100100", "Flatlands Frogking II" ],
+        [ 0x063dc, "000100 010100", "Flatlands Frogking III" ],
+        [ 0x06482, "100000 110000", "Meep" ],
+        [ 0x06528, "010100 000000", "Wind Wisp" ],
+        [ 0x065ce, "100000 010000", "Giant Sheep" ],
+        [ 0x06674, "001000 010110", "Night Raven" ],
+        [ 0x0671a, "010000 000001", "Bloody Bull" ],
+        [ 0x067c0, "000010 000010", "Skulking Fungoid" ],
+        [ 0x06866, "000000 000000", "" ],
+        [ 0x0690c, "100100 001001", "Raging Rhino" ],
+        [ 0x069b2, "000000 010010", "Snow Drake " ],
+        [ 0x06a58, "010000 100100", "Behemoth" ],
+        [ 0x06afe, "000100 100010", "Agressive Ant" ],
+        [ 0x06ba4, "100000 110000", "Shaggy Meep" ],
+        [ 0x06c4a, "001000 010110", "Dire Night Raven" ],
+        [ 0x06cf0, "000000 100100", "Antagonistic Ant" ],
+        [ 0x06d96, "100000 010000", "Mammoth Sheep" ],
+        [ 0x06e3c, "001000 010110", "Dire Ash Raven" ],
+        [ 0x06ee2, "010000 000100", "Icky Slug" ],
+        [ 0x06f88, "010100 101100", "Shaggy Spider" ],
+        [ 0x0702e, "010100 001000", "Mortal Mushroom" ],
+        [ 0x070d4, "100100 100100", "Furious Fungoid" ],
+        [ 0x0717a, "100010 001001", "River Froggen I" ],
+        [ 0x07220, "100010 010001", "River Froggen II" ],
+        [ 0x072c6, "000010 010001", "River Froggen III" ],
+        [ 0x0736c, "100010 100000", "River Froggen IV" ],
+        [ 0x07412, "100010 100000", "River Froggen V" ],
+        [ 0x074b8, "000010 001001", "River Froggen VI" ],
+        [ 0x0755e, "101000 100001", "River Frogking I" ],
+        [ 0x07604, "101000 100001", "River Frogking II" ],
+        [ 0x076aa, "000010 010100", "River Frogking III" ],
+        [ 0x07750, "000000 001011", "River Wasp" ],
+        [ 0x077f6, "100010 000100", "Giant Slug" ],
+        [ 0x0789c, "010010 000100", "Salamander" ],
+        [ 0x07942, "001010 010010", "River Fly" ],
+        [ 0x079e8, "000000 001000", "Reptalion" ],
+        [ 0x07a8e, "001010 010010", "Lord of the Flies" ],
+        [ 0x07b34, "000000 000000", "" ],
+        [ 0x07bda, "010100 010010", "Dreadwing" ],
+        [ 0x07c80, "000100 001010", "Giant Gator" ],
+        [ 0x07d26, "001010 010100", "Gigantes" ],
+        [ 0x07dcc, "000000 001011", "Warrior Wasp" ],
+        [ 0x07e72, "100011 000000", "Motley Slug" ],
+        [ 0x07f18, "100000 001011", "Red Viper" ],
+        [ 0x07fbe, "100000 001011", "Blood Viper" ],
+        [ 0x08064, "001010 010010", "Horse Fly " ],
+        [ 0x0810a, "100000 101001", "River Bug" ],
+        [ 0x081b0, "010010 000100", "Collared Salamander" ],
+        [ 0x08256, "001010 010010", "Horned Fly" ],
+        [ 0x082fc, "010100 000010", "Mad Ratkin" ],
+        [ 0x083a2, "010000 000001", "Blue Bull" ],
+        [ 0x08448, "000101 000011", "Sea Birdian I" ],
+        [ 0x084ee, "000101 000011", "Sea Birdian II" ],
+        [ 0x08594, "001001 000001", "Sea Birdian III" ],
+        [ 0x0863a, "000101 100010", "Sea Birdian IV" ],
+        [ 0x086e0, "000101 100010", "Sea Birdian V" ],
+        [ 0x08786, "001001 000001", "Sea Birdian VI" ],
+        [ 0x0882c, "000100 011010", "Sea Birdking I" ],
+        [ 0x088d2, "000100 011010", "Sea Birdking II" ],
+        [ 0x08978, "000101 000010", "Sea Birdking III" ],
+        [ 0x08a1e, "000010 000011", "Hermit Conch" ],
+        [ 0x08ac4, "100100 010001", "Flying Fish" ],
+        [ 0x08b6a, "001000 000001", "Rock Tortoise" ],
+        [ 0x08c10, "001000 001100", "Scissor Crab" ],
+        [ 0x08cb6, "001000 010010", "Kingfisher" ],
+        [ 0x08d5c, "100100 001000", "Sea Anemone" ],
+        [ 0x08e02, "000000 000000", "" ],
+        [ 0x08ea8, "100100 100010", "Cetus Maximus" ],
+        [ 0x08f4e, "000100 001100", "Reaper Crab" ],
+        [ 0x08ff4, "010000 001001", "Deep One" ],
+        [ 0x0909a, "000001 010000", "Pirate I" ],
+        [ 0x09140, "000001 010000", "Pirate II" ],
+        [ 0x091e6, "000000 010001", "Pirate III" ],
+        [ 0x0928c, "000101 010001", "Sailfish" ],
+        [ 0x09332, "000001 000010", "Buccaneer I" ],
+        [ 0x093d8, "000001 000010", "Buccaneer II" ],
+        [ 0x0947e, "000001 000010", "Sea Snake" ],
+        [ 0x09524, "001000 001100", "Scythe Crab" ],
+        [ 0x095ca, "001000 000001", "Mossy Tortoise" ],
+        [ 0x09670, "000100 010011", "Barnacle Bat" ],
+        [ 0x09716, "101001 000000", "Sea Slug" ],
+        [ 0x097bc, "001000 001100", "Barnacle Crab" ],
+        [ 0x09862, "001000 001001", "Barnacle Tortoise" ],
+        [ 0x09908, "010100 010010", "Buccaneer III" ],
+        [ 0x099ae, "010100 010010", "Buccaneer IV" ],
+        [ 0x09a54, "010100 000010", "Azure Urchin" ],
+        [ 0x09afa, "001000 001100", "Black Scissors" ],
+        [ 0x09ba0, "001000 010010", "Greater Kingfisher" ],
+        [ 0x09c46, "010000 001011", "Cliff Birdian I" ],
+        [ 0x09cec, "010000 001011", "Cliff Birdian II" ],
+        [ 0x09d92, "100001 000110", "Cliff Birdian III" ],
+        [ 0x09e38, "000100 001011", "Cliff Birdian IV" ],
+        [ 0x09ede, "000100 001011", "Cliff Birdian V" ],
+        [ 0x09f84, "100000 001010", "Cliff Birdian VI" ],
+        [ 0x0a02a, "000100 100011", "Cliff Birdking I" ],
+        [ 0x0a0d0, "000100 100011", "Cliff Birdking II" ],
+        [ 0x0a176, "000000 001110", "Cliff Birdking III" ],
+        [ 0x0a21c, "000000 001011", "Eggling" ],
+        [ 0x0a2c2, "000001 011000", "Laughing Hyaena" ],
+        [ 0x0a368, "000000 010010", "Great Condor" ],
+        [ 0x0a40e, "001001 000100", "Lloris" ],
+        [ 0x0a4b4, "000001 001000", "Creeping Treant" ],
+        [ 0x0a55a, "001000 001001", "Armor Eater" ],
+        [ 0x0a600, "000000 000000", "" ],
+        [ 0x0a6a6, "000100 101001", "Woolly Spider" ],
+        [ 0x0a74c, "000000 000010", "Giant Eagle" ],
+        [ 0x0a7f2, "100000 010010", "Heavenwing" ],
+        [ 0x0a898, "000000 001011", "Hatchling" ],
+        [ 0x0a93e, "001001 000100", "Long-eared Lloris" ],
+        [ 0x0a9e4, "000000 001011", "Two-Handed Hatchling" ],
+        [ 0x0aa8a, "000000 010010", "King Condor" ],
+        [ 0x0ab30, "000100 001001", "Creepy Fledgling" ],
+        [ 0x0abd6, "000101 001100", "Guard Dog" ],
+        [ 0x0ac7c, "000101 011000", "War Dog" ],
+        [ 0x0ad22, "001000 010110", "Tempest Falcon" ],
+        [ 0x0adc8, "011000 100000", "Marionette Bones" ],
+        [ 0x0ae6e, "010001 100000", "Puppet Bones" ],
+        [ 0x0af14, "000010 101001", "Bloody Rhino" ],
+        [ 0x0afba, "101100 101000", "Devil Deer" ],
+        [ 0x0b060, "000010 001100", "Ettin Snake" ],
+        [ 0x0b106, "000010 001000", "Killer Chameleon" ],
+        [ 0x0b1ac, "100000 001010", "Scaled Viper" ],
+        [ 0x0b252, "000000 000000", "" ],
+        [ 0x0b2f8, "000000 000000", "" ],
+        [ 0x0b39e, "000010 010110", "Black Bat" ],
+        [ 0x0b444, "000000 000000", "" ],
+        [ 0x0b4ea, "000000 000000", "" ],
+        [ 0x0b590, "000000 000000", "" ],
+        [ 0x0b636, "000001 001100", "Ettin Asp" ],
+        [ 0x0b6dc, "101000 001100", "Ettin Ophidian" ],
+        [ 0x0b782, "000000 000000", "" ],
+        [ 0x0b828, "000000 000000", "" ],
+        [ 0x0b8ce, "001010 000000", "Fire Elemental " ],
+        [ 0x0b974, "100010 000000", "Light Elemental" ],
+        [ 0x0ba1a, "010001 000000", "Dark Elemental" ],
+        [ 0x0bac0, "001010 101000", "Tyrannodrake" ],
+        [ 0x0bb66, "000010 010011", "Shadow Bat" ],
+        [ 0x0bc0c, "000101 000000", "Ice Elemental" ],
+        [ 0x0bcb2, "000110 000000", "Wind Elemental" ],
+        [ 0x0bd58, "100000 001001", "Assassin Bug" ],
+        [ 0x0bdfe, "000000 000000", "" ],
+        [ 0x0bea4, "000000 000000", "" ],
+        [ 0x0bf4a, "000000 000000", "" ],
+        [ 0x0bff0, "011000 100000", "Ambling Bones" ],
+        [ 0x0c096, "000000 000000", "" ],
+        [ 0x0c13c, "000000 000000", "" ],
+        [ 0x0c1e2, "000000 000000", "" ],
+        [ 0x0c288, "000000 110101", "Revenant" ],
+        [ 0x0c32e, "000010 110001", "Blood Revenant" ],
+        [ 0x0c3d4, "010000 110001", "Shadow Revenant" ],
+        [ 0x0c47a, "010000 000100", "Sticky Slug" ],
+        [ 0x0c520, "010000 000100", "Gooey Slug" ],
+        [ 0x0c5c6, "000000 000000", "" ],
+        [ 0x0c66c, "000010 110001", "Flame Revenant" ],
+        [ 0x0c712, "010000 110001", "Dark Revenant" ],
+        [ 0x0c7b8, "001000 110001", "Thunder Revenant" ],
+        [ 0x0c85e, "000010 001011", "Flame Remnant Mk.II" ],
+        [ 0x0c904, "010000 001011", "Shadow Remnant Mk.II" ],
+        [ 0x0c9aa, "001000 001011", "Thunder Remnant Mk.II" ],
+        [ 0x0ca50, "000001 110001", "Ice Revenant" ],
+        [ 0x0caf6, "100000 110001", "Light Revenant" ],
+        [ 0x0cb9c, "000100 110001", "Wind Revenant" ],
+        [ 0x0cc42, "000000 001111", "Remnant Mk.II" ],
+        [ 0x0cce8, "000001 001011", "Ice Remnant Mk.II" ],
+        [ 0x0cd8e, "100000 001011", "Light Remnant Mk.II" ],
+        [ 0x0ce34, "000100 001011", "Wind Remnant Mk.II" ],
+        [ 0x0ceda, "000000 001111", "Remnant" ],
+        [ 0x0cf80, "000000 000000", "" ],
+        [ 0x0d026, "000001 001011", "Ice Remnant" ],
+        [ 0x0d0cc, "000100 001011", "Wind Remnant" ],
+        [ 0x0d172, "001000 001011", "Thunder Remnant" ],
+        [ 0x0d218, "100000 001011", "Light Remnant" ],
+        [ 0x0d2be, "000000 000000", "" ],
+        [ 0x0d364, "000000 000000", "" ],
+        [ 0x0d40a, "000000 000000", "" ],
+        [ 0x0d4b0, "000000 000000", "" ],
+        [ 0x0d556, "010001 001100", "Brigand Leader I" ],
+        [ 0x0d5fc, "010001 001100", "Brigand Leader II" ],
+        [ 0x0d6a2, "010001 001000", "Brigand Leader III" ],
+        [ 0x0d748, "001000 010001", "Manticore" ],
+        [ 0x0d7ee, "001000 110001", "Menacing Manticore" ],
+        [ 0x0d894, "000000 000000", "" ],
+        [ 0x0d93a, "000000 000000", "" ],
+        [ 0x0d9e0, "010001 000101", "Spud Bug" ],
+        [ 0x0da86, "000000 000000", "" ],
+        [ 0x0db2c, "000000 000000", "" ],
+        [ 0x0dbd2, "000000 000000", "" ],
+        [ 0x0dc78, "000001 001001", "Manymaws" ],
+        [ 0x0dd1e, "000000 000000", "" ],
+        [ 0x0ddc4, "000000 000000", "" ],
+        [ 0x0de6a, "100000 010010", "Monarch" ],
+        [ 0x0df10, "000100 001001", "Crawly Fledgling" ],
+        [ 0x0dfb6, "001000 010101", "Researcher I" ],
+        [ 0x0e05c, "001000 010101", "Researcher II" ],
+        [ 0x0e102, "000000 000000", "" ],
+        [ 0x0e1a8, "000000 000000", "" ],
+        [ 0x0e24e, "010000 001101", "Believer I" ],
+        [ 0x0e2f4, "010000 001101", "Believer II" ],
+        [ 0x0e39a, "010000 001101", "Zealot I" ],
+        [ 0x0e440, "010000 001101", "Zealot II" ],
+        [ 0x0e4e6, "100000 011010", "Obsidian Executive I" ],
+        [ 0x0e58c, "011010 000001", "Obsidian Executive II" ],
+        [ 0x0e632, "100000 011010", "Constituent I" ],
+        [ 0x0e6d8, "011010 000001", "Constituent II" ],
+        [ 0x0e77e, "000010 001010", "Bodyguard I" ],
+        [ 0x0e824, "000010 001010", "Bodyguard II" ],
+        [ 0x0e8ca, "000000 001101", "Ravus Guard I" ],
+        [ 0x0e970, "000011 000000", "Ravus Guard II" ],
+        [ 0x0ea16, "000001 000101", "Werner's Man I" ],
+        [ 0x0eabc, "000001 000101", "Werner's Man II" ],
+        [ 0x0eb62, "100010 000110", "Morlock's Mercenary I" ],
+        [ 0x0ec08, "000010 000110", "Morlock's Mercenary II" ],
+        [ 0x0ecae, "000001 000101", "Werner's Man III" ],
+        [ 0x0ed54, "000100 010100", "Researcher III" ],
+        [ 0x0edfa, "000000 111011", "Sentinel Mk.II" ],
+        [ 0x0eea0, "100000 101011", "Light Sentinel Mk.II" ],
+        [ 0x0ef46, "010000 101011", "Dark Sentinel Mk.II" ],
+        [ 0x0efec, "000000 000000", "" ],
+        [ 0x0f092, "000000 010111", "Guardian" ],
+        [ 0x0f138, "000010 010101", "Flame Guardian" ],
+        [ 0x0f1de, "000001 010101", "Ice Guardian" ],
+        [ 0x0f284, "000100 010101", "Wind Guardian" ],
+        [ 0x0f32a, "001000 010101", "Thunder Guardian" ],
+        [ 0x0f3d0, "100000 010101", "Light Guardian" ],
+        [ 0x0f476, "010000 010101", "Dark Guardian" ],
+        [ 0x0f51c, "000010 101011", "Flame Sentinel Mk.II" ],
+        [ 0x0f5c2, "000001 101011", "Ice Sentinel Mk.II" ],
+        [ 0x0f668, "000100 010100", "Ravus Soldier III" ],
+        [ 0x0f70e, "000010 010101", "Fire Guardian Mk.II" ],
+        [ 0x0f7b4, "010000 010101", "Dark Guardian Mk.II" ],
+        [ 0x0f85a, "000010 010010", "Flame Curator Mk.II" ],
+        [ 0x0f900, "010000 010010", "Dark Curator Mk.II" ],
+        [ 0x0f9a6, "000100 101011", "Wind Sentinel Mk.II" ],
+        [ 0x0fa4c, "001000 101011", "Thunder Sentinel Mk.II" ],
+        [ 0x0faf2, "000000 111011", "Sentinel" ],
+        [ 0x0fb98, "000010 101011", "Fire Sentinel" ],
+        [ 0x0fc3e, "000001 101011", "Ice Sentinel" ],
+        [ 0x0fce4, "000100 101011", "Wind Sentinel" ],
+        [ 0x0fd8a, "001000 101011", "Thunder Sentinel" ],
+        [ 0x0fe30, "100000 101011", "Light Sentinel" ],
+        [ 0x0fed6, "010000 101011", "Dark Sentinel" ],
+        [ 0x0ff7c, "000000 110110", "Curator" ],
+        [ 0x10022, "000010 110010", "Flame Curator" ],
+        [ 0x100c8, "000001 110010", "Ice Curator" ],
+        [ 0x1016e, "000100 110010", "Wind Curator " ],
+        [ 0x10214, "001000 110010", "Thunder Curator" ],
+        [ 0x102ba, "100000 110010", "Light Curator" ],
+        [ 0x10360, "010000 110010", "Dark Curator" ],
+        [ 0x10406, "000000 010111", "Guardian Mk.II" ],
+        [ 0x104ac, "000001 010101", "Ice Guardian Mk.II" ],
+        [ 0x10552, "000100 010101", "Wind Guardian Mk.II" ],
+        [ 0x105f8, "001000 010101", "Thunder Guardian Mk.II" ],
+        [ 0x1069e, "100000 010101", "Light Guardian Mk.II" ],
+        [ 0x10744, "000000 010110", "Curator Mk.II" ],
+        [ 0x107ea, "000001 010010", "Ice Curator Mk.II" ],
+        [ 0x10890, "000100 010010", "Wind Curator Mk.II" ],
+        [ 0x10936, "001000 010010", "Thunder Curator Mk.II" ],
+        [ 0x109dc, "100000 010010", "Light Curator Mk.II" ],
+        [ 0x10a82, "010100 000011", "Thief I" ],
+        [ 0x10b28, "010010 010001", "Thief II" ],
+        [ 0x10bce, "010100 000011", "Master Thief I" ],
+        [ 0x10c74, "010010 010001", "Master Thief II" ],
+        [ 0x10d1a, "000000 101101", "Cait " ],
+        [ 0x10dc0, "000000 101101", "Cultured Cait" ],
+        [ 0x10e66, "000000 101101", "Chubby Cait" ],
+        [ 0x10f0c, "100010 000000", "Fire Wisp" ],
+        [ 0x10fb2, "010001 000000", "Ice Wisp" ],
+        [ 0x11058, "101000 000000", "Thunder Wisp" ]
+    ];
+}
+
+
+function findBytes(haystackBytes, needleBytes, start)
+{
+    let length = (haystackBytes.length - needleBytes.length);
+
+    for (let i = start; i <= length; i++) {
+        let match = true;
+
+        for (let j = 0; j < needleBytes.length; j++) {
+            if (haystackBytes[i + j] !== needleBytes[j]) {
+                match = false;
+                break;
+            }
+        }   
+        
+        if (match) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
+
+function findWeaknessOffset(buffer)
+{
+    let needleBytes = new TextEncoder().encode("WeaknessOpen_");
+    let haystackBytes = new Uint8Array(buffer);
+
+    // Find first occurrence of "WeaknessOpen_", this appears to be a dummy record
+    let offset = findBytes(haystackBytes, needleBytes, 0);
+    if (offset < 0) return offset;
+    
+    // Advance to second occurrence of "WeaknessOpen_"
+    offset = findBytes(haystackBytes, needleBytes, offset + 1)
+    if (offset < 0) return offset;
+
+    offset -= 4;
+    
+    return offset;
+}
+
+
+function handleArrayBuffer(buffer)
+{
+    gDataView = new DataView(buffer);
+    gOffset = findWeaknessOffset(buffer);
+
+    if (gOffset < 0) {
+        showError("Error: could not parse .sav file");
+        return;
+    }
+
+    try {
+        let enemies = [];
+        let weaknessData = getWeaknessData();
+        for (let i = 0; i < weaknessData.length; i++) {
+            let enemyName = checkWeakness(weaknessData[i]);
+            if (enemyName) enemies.push(enemyName);
+        }
+
+        showMissingEnemies(enemies);
+    } catch (e) {
+        showError("Error: " + e.toString());
+    }
+}
+
+
+function ready(fn)
+{
+    if (document.readyState === "complete" || document.readyState === "interactive") {
+        setTimeout(fn, 1);
+    } else {
+        document.addEventListener("DOMContentLoaded", fn);
+    }
+}    
+
+
+function showMissingEnemies(enemies)
+{
+    let output = document.getElementById("output");
+    
+    function addLine(text) {
+        let div = document.createElement("div");
+        div.innerText = text;
+        output.appendChild(div);
+    }
+
+    output.innerText = "";
+    
+    let noun = (enemies.length == 1) ? "enemy" : "enemies";
+    
+    addLine(`${enemies.length} missing ${noun}.`);
+    addLine(" ");
+    
+    for (let enemy of enemies) {
+        addLine("Missing enemy: " + enemy);
+    }
+}
+
+
+function showError(errorText)
+{
+    document.getElementById("output").innerText = errorText;
+}
+
+
+ready(() => {
+    let inputElement = document.getElementById("fileInput");
+
+    inputElement.addEventListener("change", event => {
+        const file = event.target.files[0];
+
+        if (!file) {
+            showError("No file selected.");
+            return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = e => {
+            let arrayBuffer = e.target.result;
+            handleArrayBuffer(arrayBuffer);
+        };
+
+        reader.onerror = () => {
+            showError("Error reading file.");
+        };
+
+        reader.readAsArrayBuffer(file);
+    });
+});
+
+</script>
+</head>
+<body>
+
+<h2>Select a .sav file</h2>
+<input type="file" id="fileInput">
+<div id="output"></div>
+</body>
+</html>
